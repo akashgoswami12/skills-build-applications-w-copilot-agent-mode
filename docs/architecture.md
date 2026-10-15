@@ -28,23 +28,24 @@ OctoFit Tracker is a three-tier application for a school fitness program. The st
 
 ## Implementation decisions
 
-- **Presentation tier:** Keep each capability in its existing React page and use the shared API client for all `/api` requests. Pages own presentation state (loading, empty, and accessible error states); business rules and persistence stay in the backend.
-- **Logic tier:** Keep Express routes thin and put input validation, orchestration, and response-ready capability logic in backend services. Return deliberate 4xx responses for invalid input, malformed or unknown IDs, and unknown users; do not expose database cast errors as 500s.
-- **Data tier:** Enforce required fields and valid value constraints in Mongoose models, represent user/team relationships with references, and keep seed data representative and idempotent. MongoDB remains the source of persisted application data.
-- **Activity tracking:** Validate the request shape and confirm both referenced records exist before creating an activity. Persist the referenced user and team, activity type, minutes, computed points, and occurrence time; use the same persisted points for the leaderboard.
-- **Team management:** Validate required team data (especially a non-empty name), persist mascot and member references, and return created/listed teams with their names and mascots intact.
-- **Leaderboard:** Aggregate activity points by team in the backend, sort from highest total to lowest, and assign ranks starting at 1. Return the documented `teamName`, `totalPoints`, and `rank` fields.
-- **Workout suggestions:** Find the requested user by email, use that user's goal and recent activity to select relevant workouts, and include a reason tied to the matching goal or activity. Return a deliberate 4xx when no user matches.
+- Presentation tier decision: Render API-backed content in the existing React pages through the shared API client. A shared resource hook handles loading and failure states; each page renders its own empty and success states.
+- Logic tier decision: Keep Express routes thin and put validation, orchestration, and response-ready capability logic in backend services. Return deliberate 4xx responses for invalid input, malformed or unknown IDs, and unknown users; never expose database cast errors as 500s.
+- Data tier decision: Enforce required fields and positive duration constraints in Mongoose models, represent user/team relationships with references, and keep seed data representative and idempotent. MongoDB remains the source of persisted application data.
+- Activity tracking approach: Validate the request and confirm the user and team exist before creating an activity. Store the activity type, positive minutes, one point per minute, and the server's occurrence time; use those persisted points for the leaderboard.
+- Team management approach: Require a non-empty name and mascot, validate that each supplied member ID identifies an existing user, and persist member references. Keep created and listed team names and mascots intact.
+- Leaderboard approach: Aggregate persisted activity points by team, order totals highest first with a stable team-ID tie-break, and assign 1-based ranks. Return the documented `teamName`, `totalPoints`, and `rank` fields.
+- Workout suggestions approach: Find the user by email, then try workouts matching the user's fitness goal followed by their most recent activity types (up to ten records). Include a reason explaining the goal or activity match and return `404` when the email is unknown.
 - **Scope:** Do not add authentication in this exercise; it remains a follow-up challenge.
 
 ## Test plan
 
 Run focused contract tests in dependency order (data, API, then presentation), followed by both production builds. A failing contract test indicates behavior or validation missing from that tier; a build failure indicates a type-check or production compilation problem.
 
-Baseline results recorded on 2026-10-15:
+Verification results recorded on 2026-10-15:
 
-- **Data tier —** `npm run test:data --prefix octofit-tracker/backend`: 4 of 5 tests failed because required model validation is missing for users, teams, activities, and workouts. The idempotent seed test passed.
-- **API —** `npm run test:api --prefix octofit-tracker/backend`: 4 of 4 tests failed. Invalid activity/team requests returned `501` rather than `400`, the leaderboard was empty, and suggestions did not match the user's expected activity pattern.
-- **Frontend —** `npm test --prefix octofit-tracker/frontend`: 15 of 15 tests failed. API-backed content and user-specific suggestion requests were missing, as were the expected accessible loading, empty, and error states.
+- **Data tier —** `npm run test:data --prefix octofit-tracker/backend`: 5 of 5 tests passed, including model validation and idempotent seeding.
+- **API —** `npm run test:api --prefix octofit-tracker/backend`: 4 of 4 tests passed, covering valid creation, deliberate 4xx responses, leaderboard ordering, and personalized recommendations.
+- **Frontend —** `npm test --prefix octofit-tracker/frontend`: 15 of 15 tests passed, covering API-backed content and accessible loading, empty, and error states.
 - **Backend build —** `npm run build --prefix octofit-tracker/backend`: passed.
 - **Frontend build —** `npm run build --prefix octofit-tracker/frontend`: passed.
+- **Repository exercise validation —** `node --test tests/exercise-validation.test.mjs`: currently reports a failure in the block-scalar workflow fixture because the repository README copy badge does not match the validator's expected template owner/name. The architecture and app-tier grading checks pass.
